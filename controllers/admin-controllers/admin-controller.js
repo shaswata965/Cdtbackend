@@ -190,7 +190,7 @@ const getAllUser = async (req, res, next) => {
     return next(new HttpError("Could not Find User Info", 404));
   }
 
-  for (const us of User) {
+  for (const us of user) {
     const getObjectParams1 = {
       Bucket: process.env.BUCKET_NAME,
       Key: us.image,
