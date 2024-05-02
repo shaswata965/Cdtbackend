@@ -2,7 +2,10 @@ const express = require("express");
 
 const { check } = require("express-validator");
 
-const fileUpload = require("../middleware/fileUpload");
+const multer = require("multer");
+
+const storage = multer.memoryStorage();
+const fileUpload = multer({ storage: storage });
 
 const route = express.Router();
 
@@ -74,7 +77,7 @@ route.patch(
 route.patch(
   "/user/updateStatus/:uid",
   [check("status").not().isEmpty()],
-  adminController.updateUser
+  adminController.updateUserStatus
 );
 
 route.patch(

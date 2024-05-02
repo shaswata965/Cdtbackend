@@ -3,10 +3,27 @@ const HttpError = require("../../models/htttp-error");
 const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+const sharp = require("sharp");
 
 const Admin = require("../../models/admin");
 const User = require("../../models/user");
 const Appointment = require("../../models/appointment");
+
+const s3 = new S3Client({
+  credentials: {
+    accessKeyId: process.env.AWS_ACESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_ACESS_KEY,
+  },
+  region: process.env.BUCKET_REGION,
+});
 
 const createAdmin = async (req, res, next) => {
   const error = validationResult(req);
@@ -27,13 +44,30 @@ const createAdmin = async (req, res, next) => {
     return next(error);
   }
 
+  const imageName = uuidv4() + req.file.originalname;
+
+  const buffer = await sharp(req.file.buffer)
+    .resize({ height: 500, width: 500, fit: "contain" })
+    .toBuffer();
+
+  const params = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: imageName,
+    Body: buffer,
+    ContentType: req.file.mimetype,
+  };
+
+  const command = new PutObjectCommand(params);
+
+  await s3.send(command);
+
   const newAdmin = new Admin({
     name,
     number,
     email,
     role,
     password: hashedPassword,
-    image: req.file.path,
+    image: imageName,
   });
 
   try {
@@ -121,6 +155,23 @@ const getAdminInfo = async (req, res, next) => {
     return next(new HttpError("Could not Find User Info", 404));
   }
 
+  const getObjectParams = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: admin.image,
+  };
+
+  const command = new GetObjectCommand(getObjectParams);
+  const url = await getSignedUrl(s3, command, { expiresIn: 5 * 3600 });
+  admin.imageURL = url;
+
+  try {
+    await admin.save();
+  } catch (err) {
+    const error = new HttpError(err, 500);
+
+    return next(error);
+  }
+
   res.json({ admin: admin.toObject({ getters: true }) });
 };
 
@@ -155,6 +206,23 @@ const getAllAdmin = async (req, res, next) => {
 
   if (!admin) {
     return next(new HttpError("Could not Find User Info", 404));
+  }
+
+  for (const ad of admin) {
+    const getObjectParams = {
+      Bucket: process.env.BUCKET_NAME,
+      Key: ad.image,
+    };
+
+    const command = new GetObjectCommand(getObjectParams);
+    const url = await getSignedUrl(s3, command, { expiresIn: 5 * 3600 });
+    ad.imageURL = url;
+
+    try {
+      await ad.save();
+    } catch (err) {
+      const error = new HttpError(err, 500);
+    }
   }
 
   res.json({ admin: admin.map((elem) => elem.toObject({ getters: true })) });
@@ -315,6 +383,24 @@ const deleteUser = async (req, res, next) => {
 
 const deleteAdmin = async (req, res, next) => {
   const aId = req.params.aid;
+  let admin;
+  try {
+    admin = await Admin.findById(aId);
+  } catch (err) {
+    return next(new HttpError(err.message, 500));
+  }
+
+  if (!admin) {
+    return next(new HttpError("Admin Couldn't be Deleted", 500));
+  }
+
+  const params = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: admin.image,
+  };
+
+  const command = new DeleteObjectCommand(params);
+  await s3.send(command);
 
   try {
     await Admin.deleteOne({ _id: aId });
@@ -359,6 +445,45 @@ const getAllAppointment = async (req, res, next) => {
   });
 };
 
+const updateUserStatus = async (req, res, next) => {
+  const error = validationResult(req);
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  const { status } = req.body;
+
+  const userId = req.params.uid;
+
+  let user;
+
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, couldn't find user",
+      500
+    );
+
+    return next(error);
+  }
+
+  user.status = status;
+
+  try {
+    await user.save();
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, couldn't update Admin",
+      500
+    );
+
+    return next(error);
+  }
+
+  res.status(200).json({ user: user.toObject({ getters: true }) });
+};
+
 exports.createAdmin = createAdmin;
 
 exports.getAdminInfo = getAdminInfo;
@@ -371,6 +496,7 @@ exports.logIn = logIn;
 exports.updateUser = updateUser;
 exports.updateAdmin = updateAdmin;
 exports.updateAppointment = updateAppointment;
+exports.updateUserStatus = updateUserStatus;
 
 exports.deleteUser = deleteUser;
 exports.deleteAdmin = deleteAdmin;
