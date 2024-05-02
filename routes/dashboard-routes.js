@@ -4,6 +4,8 @@ const { check } = require("express-validator");
 
 const route = express.Router();
 
+const multer = require("multer");
+
 const userController = require("../controllers/dashboard-controllers/user-controllers");
 const appointmentController = require("../controllers/dashboard-controllers/appointment-controller");
 

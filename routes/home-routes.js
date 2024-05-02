@@ -5,6 +5,8 @@ const routes = express.Router();
 
 const homeController = require("../controllers/home-controllers/home-controller");
 
+const multer = require("multer");
+
 const storage = multer.memoryStorage();
 const fileUpload = multer({ storage: storage });
 
