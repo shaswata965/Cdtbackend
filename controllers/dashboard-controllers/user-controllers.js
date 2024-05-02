@@ -51,14 +51,16 @@ const getUserInfo = async (req, res, next) => {
   const url1 = await getSignedUrl(s3, command1, { expiresIn: 5 * 3600 });
   user.imageURL = url1;
 
-  const getObjectParams2 = {
-    Bucket: process.env.BUCKET_NAME,
-    Key: user.coverImage,
-  };
+  if (coverImage) {
+    const getObjectParams2 = {
+      Bucket: process.env.BUCKET_NAME,
+      Key: user.coverImage,
+    };
 
-  const command2 = new GetObjectCommand(getObjectParams2);
-  const url2 = await getSignedUrl(s3, command2, { expiresIn: 5 * 3600 });
-  user.coverImageURL = url2;
+    const command2 = new GetObjectCommand(getObjectParams2);
+    const url2 = await getSignedUrl(s3, command2, { expiresIn: 5 * 3600 });
+    user.coverImageURL = url2;
+  }
 
   try {
     await user.save();
