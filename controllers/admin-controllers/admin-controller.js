@@ -332,7 +332,7 @@ const updateAdmin = async (req, res, next) => {
     return next(new HttpError("Invalid data", 422));
   }
 
-  const { name, email, role, password, image } = req.body;
+  const { name, email, role, password, image, imageURL } = req.body;
 
   const adminId = req.params.aid;
 
@@ -353,6 +353,7 @@ const updateAdmin = async (req, res, next) => {
   admin.role = role;
   admin.email = email;
   admin.image = image;
+  admin.imageURL = imageURL;
   admin.password = password;
 
   try {
