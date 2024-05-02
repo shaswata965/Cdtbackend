@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
 const dotenv = require("dotenv");
+const serverless = require("serverless-http");
 
 dotenv.config();
 
@@ -61,8 +62,10 @@ mongoose
   )
   .then(() => {
     console.log("Connected to Database");
-    app.listen(3000);
+    app.listen(5000);
   })
   .catch((err) => {
     console.log(err);
   });
+
+module.exports.handler = serverless(app);
