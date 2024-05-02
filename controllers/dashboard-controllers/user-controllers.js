@@ -123,14 +123,14 @@ const updateUser = async (req, res, next) => {
     Bucket: process.env.BUCKET_NAME,
     Key: imageName,
     Body: imageBuffer,
-    ContentType: req.file.mimetype,
+    ContentType: req.files.profileImage[0].mimetype,
   };
 
   const params2 = {
     Bucket: process.env.BUCKET_NAME,
     Key: coverImageName,
     Body: coverImageBuffer,
-    ContentType: req.file.mimetype,
+    ContentType: req.files.coverImage[0].mimetype,
   };
 
   const command1 = new PutObjectCommand(params1);
