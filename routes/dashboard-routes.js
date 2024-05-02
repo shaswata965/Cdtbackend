@@ -7,7 +7,9 @@ const route = express.Router();
 const userController = require("../controllers/dashboard-controllers/user-controllers");
 const appointmentController = require("../controllers/dashboard-controllers/appointment-controller");
 
-const fileUpload = require("../middleware/fileUpload");
+const storage = multer.memoryStorage();
+const fileUpload = multer({ storage: storage });
+
 const checkUserAuth = require("../middleware/chek-user-auth");
 
 route.get("/user/info/:uid", userController.getUserInfo);

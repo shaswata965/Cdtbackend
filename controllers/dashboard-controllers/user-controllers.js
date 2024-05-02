@@ -4,9 +4,26 @@ const { validationResult } = require("express-validator");
 
 const bcrypt = require("bcryptjs");
 
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const sharp = require("sharp");
+
 const User = require("../../models/user");
 
 const Assessment = require("../../models/assessment");
+
+const s3 = new S3Client({
+  credentials: {
+    accessKeyId: process.env.AWS_ACESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_ACESS_KEY,
+  },
+  region: process.env.BUCKET_REGION,
+});
 
 const getUserInfo = async (req, res, next) => {
   const userId = req.params.uid;
@@ -23,6 +40,32 @@ const getUserInfo = async (req, res, next) => {
 
   if (!user) {
     return next(new HttpError("Could not Find User Info", 404));
+  }
+
+  const getObjectParams1 = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: user.image,
+  };
+
+  const command1 = new GetObjectCommand(getObjectParams1);
+  const url1 = await getSignedUrl(s3, command1, { expiresIn: 5 * 3600 });
+  user.imageURL = url1;
+
+  const getObjectParams2 = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: user.coverImage,
+  };
+
+  const command2 = new GetObjectCommand(getObjectParams2);
+  const url2 = await getSignedUrl(s3, command2, { expiresIn: 5 * 3600 });
+  user.coverImageURL = url2;
+
+  try {
+    await user.save();
+  } catch (err) {
+    const error = new HttpError(err, 500);
+
+    return next(error);
   }
 
   res.json({ user: user.toObject({ getters: true }) });
@@ -62,6 +105,38 @@ const updateUser = async (req, res, next) => {
 
     return next(error);
   }
+
+  const imageName = uuidv4() + req.files.profileImage[0].originalname;
+  const coverImageName = uuidv4() + req.files.coverImage[0].originalname;
+
+  const imageBuffer = await sharp(req.files.profileImage[0].buffer)
+    .resize({ height: 500, width: 500, fit: "contain" })
+    .toBuffer();
+
+  const coverImageBuffer = await sharp(req.files.coverImage[0].buffer)
+    .resize({ height: 841, width: 2000, fit: "contain" })
+    .toBuffer();
+
+  const params1 = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: imageName,
+    Body: buffer,
+    ContentType: req.file.mimetype,
+  };
+
+  const params2 = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: coverImageName,
+    Body: buffer,
+    ContentType: req.file.mimetype,
+  };
+
+  const command1 = new PutObjectCommand(params1);
+  const command2 = new PutObjectCommand(params2);
+
+  await s3.send(command1);
+  await s3.send(command2);
+
   user.fname = fname;
   user.lname = lname;
   user.email = email;
@@ -73,8 +148,8 @@ const updateUser = async (req, res, next) => {
   user.about = about;
   user.zipcode = zipcode;
   user.country = country;
-  user.image = req.files.profileImage[0].path;
-  user.coverImage = req.files.coverImage[0].path;
+  user.image = imageName;
+  user.coverImage = coverImageName;
 
   try {
     await user.save();

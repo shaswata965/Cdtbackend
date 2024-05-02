@@ -5,7 +5,8 @@ const routes = express.Router();
 
 const homeController = require("../controllers/home-controllers/home-controller");
 
-const fileUpload = require("../middleware/fileUpload");
+const storage = multer.memoryStorage();
+const fileUpload = multer({ storage: storage });
 
 routes.post(
   "/appointment/:uid",

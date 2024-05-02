@@ -190,6 +190,32 @@ const getAllUser = async (req, res, next) => {
     return next(new HttpError("Could not Find User Info", 404));
   }
 
+  for (const us of User) {
+    const getObjectParams1 = {
+      Bucket: process.env.BUCKET_NAME,
+      Key: us.image,
+    };
+
+    const command1 = new GetObjectCommand(getObjectParams1);
+    const url1 = await getSignedUrl(s3, command1, { expiresIn: 5 * 3600 });
+    us.imageURL = url1;
+
+    const getObjectParams2 = {
+      Bucket: process.env.BUCKET_NAME,
+      Key: us.coverImage,
+    };
+
+    const command2 = new GetObjectCommand(getObjectParams2);
+    const url2 = await getSignedUrl(s3, command2, { expiresIn: 5 * 3600 });
+    us.coverImageURL = url2;
+
+    try {
+      await us.save();
+    } catch (err) {
+      const error = new HttpError(err, 500);
+    }
+  }
+
   res.json({ user: user.map((elem) => elem.toObject({ getters: true })) });
 };
 
@@ -372,6 +398,32 @@ const updateAdmin = async (req, res, next) => {
 
 const deleteUser = async (req, res, next) => {
   const uId = req.params.uid;
+  let user;
+  try {
+    user = await User.findById(uId);
+  } catch (err) {
+    return next(new HttpError(err.message, 500));
+  }
+
+  if (!user) {
+    return next(new HttpError("Admin Couldn't be Deleted", 500));
+  }
+
+  const params1 = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: user.image,
+  };
+
+  const command1 = new DeleteObjectCommand(params1);
+  await s3.send(command1);
+
+  const params2 = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: user.coverImage,
+  };
+
+  const command2 = new DeleteObjectCommand(params2);
+  await s3.send(command2);
 
   try {
     await User.deleteOne({ _id: uId });
