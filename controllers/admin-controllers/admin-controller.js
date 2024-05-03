@@ -321,9 +321,29 @@ const updateAppointment = async (req, res, next) => {
     return next(new HttpError("Invalid data", 422));
   }
 
-  const { status } = req.body;
+  const { status, alertText } = req.body;
 
   const appId = req.params.aid;
+
+  const curDate = new Date();
+
+  const dateOfMonth = curDate.getDate().toString();
+  let hourNow = curDate.getHours();
+  let minuteNow = curDate.getMinutes();
+
+  if (minuteNow <= 9) {
+    minuteNow = "0" + minuteNow.toString();
+  }
+
+  let timeNow;
+
+  if (hourNow >= 12) {
+    hourNow = hourNow - 12;
+    timeNow = hourNow.toString() + ":" + minuteNow + " PM";
+  } else {
+    timeNow = hourNow.toString() + ":" + minuteNow + " AM";
+  }
+  const alert = { time: timeNow, date: dateOfMonth, alertText };
 
   let app;
 
@@ -339,6 +359,8 @@ const updateAppointment = async (req, res, next) => {
   }
 
   app.status = status;
+
+  app.alerts.push(alert);
 
   try {
     await app.save();

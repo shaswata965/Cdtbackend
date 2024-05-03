@@ -11,8 +11,6 @@ const Contact = require("../../models/contact");
 const createAppointment = async (req, res, next) => {
   const error = validationResult(req);
 
-  console.log(req.body);
-
   if (!error.isEmpty()) {
     return next(new HttpError(error.message, 422));
   }
@@ -36,6 +34,7 @@ const createAppointment = async (req, res, next) => {
     completed,
     courseName,
     appName,
+    alertText,
   } = req.body;
 
   const curDate = new Date();
@@ -52,12 +51,10 @@ const createAppointment = async (req, res, next) => {
 
   if (hourNow >= 12) {
     hourNow = hourNow - 12;
-    timeNow = hourNow.toString() + ":" + minuteNow;
+    timeNow = hourNow.toString() + ":" + minuteNow + " PM";
   } else {
-    timeNow = hourNow.toString() + ":" + minuteNow;
+    timeNow = hourNow.toString() + ":" + minuteNow + " AM";
   }
-
-  const alertText = "Awaiting Confirmation";
   const alert = { time: timeNow, date: dateOfMonth, alertText };
 
   const newAppointment = new Appointment({

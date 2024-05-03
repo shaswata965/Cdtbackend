@@ -12,6 +12,7 @@ const updateStatus = async (req, res, next) => {
     return next(new HttpError("Invalid data", 422));
   }
   const { status } = req.body;
+
   const aId = req.params.aid;
 
   let appointment;
@@ -67,9 +68,7 @@ const getAppointmentInfo = async (req, res, next) => {
 
 const getAllAppointmentInfo = async (req, res, next) => {
   const userId = req.params.uid;
-
   let appointment;
-
   try {
     appointment = await Appointment.find({ userId: userId });
   } catch (err) {
@@ -165,7 +164,6 @@ const createIntent = async (req, res, next) => {
   if (!error.isEmpty()) {
     return next(new HttpError("Invalid data", 422));
   }
-  console.log(req.body);
   const { name, email, amount } = req.body;
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: "2023-10-16",
