@@ -77,6 +77,11 @@ route.patch(
   appointmentController.updatePayment
 );
 
+route.delete(
+  "/appointment/delete/:aid",
+  appointmentController.deleteAppointment
+);
+
 route.delete("/appointment/:aid", appointmentController.deleteAppointment);
 
 module.exports = route;

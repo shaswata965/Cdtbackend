@@ -28,6 +28,7 @@ const appointmentSchema = Schema({
   ],
   completed: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
+  paymentDate: { type: String },
 });
 
 module.exports = mongoose.model("Appointment", appointmentSchema);

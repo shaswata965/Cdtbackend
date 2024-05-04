@@ -343,7 +343,7 @@ const updateAppointment = async (req, res, next) => {
   } else {
     timeNow = hourNow.toString() + ":" + minuteNow + " AM";
   }
-  const alert = { time: timeNow, date: dateOfMonth, alertText };
+  let alert = { time: timeNow, date: dateOfMonth, alertText };
 
   let app;
 
@@ -359,6 +359,11 @@ const updateAppointment = async (req, res, next) => {
   }
 
   app.status = status;
+
+  if (app.due === "0") {
+    alert = { ...alert, alertText: "Payment Received" };
+    app.status = "PAID AND CONFIRMED";
+  }
 
   app.alerts.push(alert);
 

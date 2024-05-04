@@ -192,7 +192,7 @@ const updatePayment = async (req, res, next) => {
     return next(new HttpError("Invalid data", 422));
   }
 
-  const { amount } = req.body;
+  const { amount, alertText } = req.body;
   const aId = req.params.aid;
 
   let appointment;
@@ -208,9 +208,32 @@ const updatePayment = async (req, res, next) => {
     );
   }
 
-  (appointment.paymentStatus = "PAID"),
-    (appointment.due = parseInt(appointment.due) - amount);
+  appointment.paymentStatus = "PAID";
+  appointment.due = parseInt(appointment.due) - amount;
   appointment.amountPaid = amount;
+  appointment.status = "PAID AND CONFIRMED";
+
+  const curDate = new Date();
+
+  const dateOfMonth = curDate.getDate().toString();
+  let hourNow = curDate.getHours();
+  let minuteNow = curDate.getMinutes();
+
+  if (minuteNow <= 9) {
+    minuteNow = "0" + minuteNow.toString();
+  }
+
+  let timeNow;
+
+  if (hourNow >= 12) {
+    hourNow = hourNow - 12;
+    timeNow = hourNow.toString() + ":" + minuteNow + " PM";
+  } else {
+    timeNow = hourNow.toString() + ":" + minuteNow + " AM";
+  }
+  const alert = { time: timeNow, date: dateOfMonth, alertText };
+
+  appointment.alerts.push(alert);
 
   await appointment.save();
 
@@ -222,21 +245,8 @@ const updatePayment = async (req, res, next) => {
 const deleteAppointment = async (req, res, next) => {
   const aId = req.params.aid;
 
-  let appointment;
-
   try {
-    appointment = await Appointment.findById(aId);
-  } catch (err) {
-    return next(
-      new HttpError(
-        "Something went wrong, couldn't find appointment to delete",
-        500
-      )
-    );
-  }
-
-  try {
-    await appointment.remove();
+    await Appointment.deleteOne({ _id: aId });
   } catch (err) {
     return next(
       new HttpError("Something went wrong, couldn't delete Appointement", 500)

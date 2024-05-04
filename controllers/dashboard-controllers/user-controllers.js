@@ -165,7 +165,6 @@ const updateUser = async (req, res, next) => {
 };
 
 const updatePassword = async (req, res, next) => {
-  console.log(req.body);
   const error = validationResult(req);
 
   if (!error.isEmpty()) {

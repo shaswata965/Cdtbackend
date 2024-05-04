@@ -214,7 +214,6 @@ const logIn = async (req, res, next) => {
   }
 
   let token;
-  console.log(process.env.USER_SECRET_KEY);
   try {
     token = jwt.sign(
       { userId: existUser.id, email: existUser.email },
