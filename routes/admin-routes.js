@@ -50,6 +50,20 @@ route.patch(
 );
 
 route.post(
+  "/user/create/assessment",
+  fileUpload.fields([]),
+  [
+    check("name").not().isEmpty(),
+    check("email").not().isEmpty(),
+    check("userId").not().isEmpty(),
+    check("appointmentId").not().isEmpty(),
+    check("total").not().isEmpty(),
+    check("infractionsStr").not().isEmpty(),
+  ],
+  adminController.createAsssessment
+);
+
+route.post(
   "/signup",
   fileUpload.single("image"),
   [

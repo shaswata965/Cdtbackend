@@ -17,6 +17,7 @@ const Admin = require("../../models/admin");
 const User = require("../../models/user");
 const Appointment = require("../../models/appointment");
 const Course = require("../../models/course");
+const Assessment = require("../../models/assessment");
 
 const s3 = new S3Client({
   credentials: {
@@ -50,7 +51,9 @@ const createCourse = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(201).json({ course: newCourse.toObject({ getters: true }) });
+  res.status(201).json({
+    course: newCourse.toObject({ getters: true }),
+  });
 };
 
 const createAdmin = async (req, res, next) => {
@@ -106,7 +109,93 @@ const createAdmin = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(201).json({ admin: newAdmin.toObject({ getters: true }) });
+  res.status(201).json({
+    admin: newAdmin.toObject({ getters: true }),
+  });
+};
+
+const createAsssessment = async (req, res, next) => {
+  const error = validationResult(req);
+
+  if (!error.isEmpty()) {
+    return next(new HttpError(error.message, 422));
+  }
+
+  const { name, email, userId, appointmentId, infractionsStr, total } =
+    req.body;
+
+  const curDate = new Date();
+
+  const dateOfMonth = curDate.getDate().toString();
+  let hourNow = curDate.getHours();
+  let minuteNow = curDate.getMinutes();
+
+  if (minuteNow <= 9) {
+    minuteNow = "0" + minuteNow.toString();
+  }
+
+  let timeNow;
+
+  if (hourNow >= 12) {
+    hourNow = hourNow - 12;
+    timeNow = hourNow.toString() + ":" + minuteNow + " PM";
+  } else {
+    timeNow = hourNow.toString() + ":" + minuteNow + " AM";
+  }
+  let alert = {
+    time: timeNow,
+    date: dateOfMonth,
+    alertText: "Assessment Score Updated",
+  };
+
+  let app;
+
+  try {
+    app = await Appointment.findById(appointmentId);
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, couldn't find user",
+      500
+    );
+
+    return next(error);
+  }
+  app.status = "COMPLETED";
+
+  app.alerts.push(alert);
+
+  try {
+    await app.save();
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, couldn't update user",
+      500
+    );
+    return next(error);
+  }
+
+  const infractions = JSON.parse(infractionsStr);
+
+  const newAssessment = new Assessment({
+    name,
+    email,
+    userId,
+    appointmentId,
+    infractions,
+    total,
+  });
+
+  try {
+    await newAssessment.save();
+  } catch (err) {
+    const error = new HttpError(err, 500);
+
+    return next(error);
+  }
+
+  res.status(201).json({
+    assessment: newAssessment.toObject({ getters: true }),
+  });
 };
 
 const logIn = async (req, res, next) => {
@@ -151,7 +240,10 @@ const logIn = async (req, res, next) => {
 
   try {
     token = jwt.sign(
-      { adminId: existAdmin.id, email: existAdmin.email },
+      {
+        adminId: existAdmin.id,
+        email: existAdmin.email,
+      },
       process.env.ADMIN_SECRET_KEY,
       { expiresIn: "10h" }
     );
@@ -189,7 +281,9 @@ const getAdminInfo = async (req, res, next) => {
   };
 
   const command = new GetObjectCommand(getObjectParams);
-  const url = await getSignedUrl(s3, command, { expiresIn: 5 * 3600 });
+  const url = await getSignedUrl(s3, command, {
+    expiresIn: 5 * 3600,
+  });
   admin.imageURL = url;
 
   try {
@@ -200,7 +294,9 @@ const getAdminInfo = async (req, res, next) => {
     return next(error);
   }
 
-  res.json({ admin: admin.toObject({ getters: true }) });
+  res.json({
+    admin: admin.toObject({ getters: true }),
+  });
 };
 
 const getCourseInfo = async (req, res, next) => {
@@ -220,7 +316,9 @@ const getCourseInfo = async (req, res, next) => {
     return next(new HttpError("Could not Find User Info", 404));
   }
 
-  res.json({ course: course.toObject({ getters: true }) });
+  res.json({
+    course: course.toObject({ getters: true }),
+  });
 };
 
 const getAllUser = async (req, res, next) => {
@@ -245,7 +343,9 @@ const getAllUser = async (req, res, next) => {
     };
 
     const command1 = new GetObjectCommand(getObjectParams1);
-    const url1 = await getSignedUrl(s3, command1, { expiresIn: 5 * 3600 });
+    const url1 = await getSignedUrl(s3, command1, {
+      expiresIn: 5 * 3600,
+    });
     us.imageURL = url1;
 
     if (us.coverImage) {
@@ -255,7 +355,9 @@ const getAllUser = async (req, res, next) => {
       };
 
       const command2 = new GetObjectCommand(getObjectParams2);
-      const url2 = await getSignedUrl(s3, command2, { expiresIn: 5 * 3600 });
+      const url2 = await getSignedUrl(s3, command2, {
+        expiresIn: 5 * 3600,
+      });
       us.coverImageURL = url2;
     }
 
@@ -266,7 +368,9 @@ const getAllUser = async (req, res, next) => {
     }
   }
 
-  res.json({ user: user.map((elem) => elem.toObject({ getters: true })) });
+  res.json({
+    user: user.map((elem) => elem.toObject({ getters: true })),
+  });
 };
 
 const getAllCourse = async (req, res, next) => {
@@ -284,7 +388,9 @@ const getAllCourse = async (req, res, next) => {
     return next(new HttpError("Could not Find User Info", 404));
   }
 
-  res.json({ course: course.map((elem) => elem.toObject({ getters: true })) });
+  res.json({
+    course: course.map((elem) => elem.toObject({ getters: true })),
+  });
 };
 
 const getAllAdmin = async (req, res, next) => {
@@ -309,7 +415,9 @@ const getAllAdmin = async (req, res, next) => {
     };
 
     const command = new GetObjectCommand(getObjectParams);
-    const url = await getSignedUrl(s3, command, { expiresIn: 5 * 3600 });
+    const url = await getSignedUrl(s3, command, {
+      expiresIn: 5 * 3600,
+    });
     ad.imageURL = url;
 
     try {
@@ -319,7 +427,9 @@ const getAllAdmin = async (req, res, next) => {
     }
   }
 
-  res.json({ admin: admin.map((elem) => elem.toObject({ getters: true })) });
+  res.json({
+    admin: admin.map((elem) => elem.toObject({ getters: true })),
+  });
 };
 
 const updateUser = async (req, res, next) => {
@@ -378,7 +488,9 @@ const updateUser = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(200).json({ user: user.toObject({ getters: true }) });
+  res.status(200).json({
+    user: user.toObject({ getters: true }),
+  });
 };
 
 const updateAppointment = async (req, res, next) => {
@@ -409,7 +521,11 @@ const updateAppointment = async (req, res, next) => {
   } else {
     timeNow = hourNow.toString() + ":" + minuteNow + " AM";
   }
-  let alert = { time: timeNow, date: dateOfMonth, alertText };
+  let alert = {
+    time: timeNow,
+    date: dateOfMonth,
+    alertText,
+  };
 
   let app;
 
@@ -427,7 +543,10 @@ const updateAppointment = async (req, res, next) => {
   app.status = status;
 
   if (app.due === "0") {
-    alert = { ...alert, alertText: "Payment Received" };
+    alert = {
+      ...alert,
+      alertText: "Payment Received",
+    };
     app.status = "PAID AND CONFIRMED";
   }
 
@@ -444,7 +563,9 @@ const updateAppointment = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(200).json({ appointment: app.toObject({ getters: true }) });
+  res.status(200).json({
+    appointment: app.toObject({ getters: true }),
+  });
 };
 
 const updateAdmin = async (req, res, next) => {
@@ -488,7 +609,9 @@ const updateAdmin = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(200).json({ admin: admin.toObject({ getters: true }) });
+  res.status(200).json({
+    admin: admin.toObject({ getters: true }),
+  });
 };
 
 const deleteUser = async (req, res, next) => {
@@ -641,11 +764,14 @@ const updateUserStatus = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(200).json({ user: user.toObject({ getters: true }) });
+  res.status(200).json({
+    user: user.toObject({ getters: true }),
+  });
 };
 
 exports.createAdmin = createAdmin;
 exports.createCourse = createCourse;
+exports.createAsssessment = createAsssessment;
 
 exports.getAdminInfo = getAdminInfo;
 exports.getCourseInfo = getCourseInfo;
