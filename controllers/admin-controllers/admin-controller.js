@@ -16,6 +16,7 @@ const sharp = require("sharp");
 const Admin = require("../../models/admin");
 const User = require("../../models/user");
 const Appointment = require("../../models/appointment");
+const Course = require("../../models/course");
 
 const s3 = new S3Client({
   credentials: {
@@ -24,6 +25,33 @@ const s3 = new S3Client({
   },
   region: process.env.BUCKET_REGION,
 });
+
+const createCourse = async (req, res, next) => {
+  const error = validationResult(req);
+
+  if (!error.isEmpty()) {
+    return next(new HttpError(error.message, 422));
+  }
+
+  const { name, price, number, featureArray } = req.body;
+
+  const newCourse = new Course({
+    name,
+    price,
+    number,
+    featureArray: JSON.parse(featureArray),
+  });
+
+  try {
+    await newCourse.save();
+  } catch (err) {
+    const error = new HttpError(err, 500);
+
+    return next(error);
+  }
+
+  res.status(201).json({ course: newCourse.toObject({ getters: true }) });
+};
 
 const createAdmin = async (req, res, next) => {
   const error = validationResult(req);
@@ -175,6 +203,26 @@ const getAdminInfo = async (req, res, next) => {
   res.json({ admin: admin.toObject({ getters: true }) });
 };
 
+const getCourseInfo = async (req, res, next) => {
+  const courseId = req.params.cid;
+
+  let course;
+
+  try {
+    course = await Course.findById(courseId);
+  } catch (err) {
+    const error = new HttpError("Something went wrong, couldn't find Course");
+
+    return next(error);
+  }
+
+  if (!course) {
+    return next(new HttpError("Could not Find User Info", 404));
+  }
+
+  res.json({ course: course.toObject({ getters: true }) });
+};
+
 const getAllUser = async (req, res, next) => {
   let user;
 
@@ -219,6 +267,24 @@ const getAllUser = async (req, res, next) => {
   }
 
   res.json({ user: user.map((elem) => elem.toObject({ getters: true })) });
+};
+
+const getAllCourse = async (req, res, next) => {
+  let course;
+
+  try {
+    course = await Course.find();
+  } catch (err) {
+    const error = new HttpError("Something went wrong, couldn't find user");
+
+    return next(error);
+  }
+
+  if (!course) {
+    return next(new HttpError("Could not Find User Info", 404));
+  }
+
+  res.json({ course: course.map((elem) => elem.toObject({ getters: true })) });
 };
 
 const getAllAdmin = async (req, res, next) => {
@@ -505,6 +571,18 @@ const deleteAppointment = async (req, res, next) => {
   res.status(200).json({ message: "Successfully deleted Appointment" });
 };
 
+const deleteCourse = async (req, res, next) => {
+  const cId = req.params.cid;
+
+  try {
+    await Course.deleteOne({ _id: cId });
+  } catch (err) {
+    return next(new HttpError(err.message, 500));
+  }
+
+  res.status(200).json({ message: "Successfully deleted Course" });
+};
+
 const getAllAppointment = async (req, res, next) => {
   let appointment;
 
@@ -567,11 +645,14 @@ const updateUserStatus = async (req, res, next) => {
 };
 
 exports.createAdmin = createAdmin;
+exports.createCourse = createCourse;
 
 exports.getAdminInfo = getAdminInfo;
+exports.getCourseInfo = getCourseInfo;
 exports.getAllUser = getAllUser;
 exports.getAllAdmin = getAllAdmin;
 exports.getAllAppointment = getAllAppointment;
+exports.getAllCourse = getAllCourse;
 
 exports.logIn = logIn;
 
@@ -583,3 +664,4 @@ exports.updateUserStatus = updateUserStatus;
 exports.deleteUser = deleteUser;
 exports.deleteAdmin = deleteAdmin;
 exports.deleteAppointment = deleteAppointment;
+exports.deleteCourse = deleteCourse;

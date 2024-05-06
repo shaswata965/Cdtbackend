@@ -17,6 +17,8 @@ const User = require("../../models/user");
 
 const Assessment = require("../../models/assessment");
 
+const Course = require("../../models/course");
+
 const s3 = new S3Client({
   credentials: {
     accessKeyId: process.env.AWS_ACESS_KEY,
@@ -251,8 +253,27 @@ const getAssessmentInfo = async (req, res, next) => {
   res.json({ assessment: assessment.toObject({ getters: true }) });
 };
 
+const getAllCourse = async (req, res, next) => {
+  let course;
+
+  try {
+    course = await Course.find();
+  } catch (err) {
+    const error = new HttpError("Something went wrong, couldn't find user");
+
+    return next(error);
+  }
+
+  if (!course) {
+    return next(new HttpError("Could not Find Course Info", 404));
+  }
+
+  res.json({ course: course.map((elem) => elem.toObject({ getters: true })) });
+};
+
 exports.getUserInfo = getUserInfo;
 exports.getAssessmentInfo = getAssessmentInfo;
+exports.getAllCourse = getAllCourse;
 
 exports.updateUser = updateUser;
 exports.updatePassword = updatePassword;

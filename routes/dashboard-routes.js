@@ -15,6 +15,7 @@ const fileUpload = multer({ storage: storage });
 const checkUserAuth = require("../middleware/chek-user-auth");
 
 route.get("/user/info/:uid", userController.getUserInfo);
+route.get("/course/info/all", userController.getAllCourse);
 route.get("/appointment/:day", appointmentController.getAppointmentDay);
 route.get("/appointment/info/:aid", appointmentController.getAppointmentInfo);
 
