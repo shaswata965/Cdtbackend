@@ -28,6 +28,7 @@ route.get(
 );
 
 route.use(checkUserAuth);
+
 route.patch(
   "/user/info/:uid",
   fileUpload.fields([

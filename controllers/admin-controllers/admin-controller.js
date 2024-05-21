@@ -174,6 +174,49 @@ const createAsssessment = async (req, res, next) => {
     return next(error);
   }
 
+  let user;
+
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, couldn't find user",
+      500
+    );
+
+    return next(error);
+  }
+  user.scoreIndicator = total;
+
+  prevHourArr = user.totalHours?.split(" ");
+  console.log(prevHourArr);
+
+  prevHour = prevHourArr ? parseFloat(prevHourArr[0]) : 0;
+
+  curHourArr = app.duration.split(" ");
+
+  curHour = parseFloat(curHourArr[0]);
+
+  user.hourIndicator =
+    ((prevHour > 0 ? prevHour - curHour : curHour) / (prevHour > 0 || 1)) * 100;
+  user.scoreIndicator =
+    ((user.latestScore ? user.latestScore - total : total) /
+      (user.latestScore || 1)) *
+    100;
+
+  user.totalHours = (prevHour + curHour).toString() + " hours";
+  user.latestScore = total;
+
+  try {
+    await user.save();
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, couldn't update user",
+      500
+    );
+    return next(error);
+  }
+
   const infractions = JSON.parse(infractionsStr);
 
   const newAssessment = new Assessment({
@@ -542,7 +585,7 @@ const updateAppointment = async (req, res, next) => {
 
   app.status = status;
 
-  if (app.due === "0") {
+  if (app.due === "0" && app.status != "EXPIRED") {
     alert = {
       ...alert,
       alertText: "Payment Received",
@@ -708,7 +751,6 @@ const deleteCourse = async (req, res, next) => {
 
 const getAllAppointment = async (req, res, next) => {
   let appointment;
-
   try {
     appointment = await Appointment.find();
   } catch (err) {
