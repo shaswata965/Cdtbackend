@@ -29,6 +29,13 @@ route.get(
 
 route.use(checkUserAuth);
 
+route.post(
+  "/user-lesson/:uid",
+  fileUpload.fields([]),
+  [check("lessons").not().isEmpty()],
+  userController.updateLessons
+);
+
 route.patch(
   "/user/info/:uid",
   fileUpload.fields([

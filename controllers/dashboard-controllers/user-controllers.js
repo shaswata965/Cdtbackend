@@ -271,9 +271,35 @@ const getAllCourse = async (req, res, next) => {
   res.json({ course: course.map((elem) => elem.toObject({ getters: true })) });
 };
 
+updateLessons = async (req, res, next) => {
+  const error = validationResult(req);
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+  const userId = req.params.uid;
+  let user;
+
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  user.balance = parseInt(req.body.lessons) * 70;
+
+  try {
+    await user.save();
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  res.json({ user: user.toObject({ getters: true }) });
+};
+
 exports.getUserInfo = getUserInfo;
 exports.getAssessmentInfo = getAssessmentInfo;
 exports.getAllCourse = getAllCourse;
 
 exports.updateUser = updateUser;
 exports.updatePassword = updatePassword;
+exports.updateLessons = updateLessons;

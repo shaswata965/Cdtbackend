@@ -26,6 +26,7 @@ const userSchema = Schema({
   scoreIndicator: { type: String },
   totalHours: { type: String },
   hourIndicator: { type: String },
+  balance: { type: String },
   createdAt: { type: Date, default: Date.now },
 });
 
