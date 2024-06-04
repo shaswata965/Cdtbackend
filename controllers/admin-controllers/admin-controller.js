@@ -3,7 +3,7 @@ const HttpError = require("../../models/htttp-error");
 const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-var postmark = require("postmark");
+const postmark = require("postmark");
 const {
   S3Client,
   PutObjectCommand,
@@ -13,7 +13,7 @@ const {
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const sharp = require("sharp");
-var client = new postmark.ServerClient(process.env.POSTMARK_SECRET_KEY);
+let client = new postmark.ServerClient("" + process.env.POSTMARK_SECRET_KEY);
 
 const Admin = require("../../models/admin");
 const User = require("../../models/user");
