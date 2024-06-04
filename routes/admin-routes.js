@@ -29,7 +29,8 @@ route.get("/user/all", adminController.getAllUser);
 route.get("/course/all", adminController.getAllCourse);
 route.get("/appointment/all", adminController.getAllAppointment);
 route.get("/course/info/:cid", adminController.getCourseInfo);
-
+route.get("/user-paydue/:uid", adminController.payUserDue);
+route.get("/user-info/search/:info", adminController.searchUser);
 route.use(checkAdminAuth);
 
 route.patch(
@@ -50,6 +51,12 @@ route.patch(
 );
 
 route.post(
+  "/user-appointment/link/:aid",
+  [check("userId").not().isEmpty()],
+  adminController.linkAppointment
+);
+
+route.post(
   "/user/create/assessment",
   fileUpload.fields([]),
   [
@@ -59,8 +66,9 @@ route.post(
     check("appointmentId").not().isEmpty(),
     check("total").not().isEmpty(),
     check("infractionsStr").not().isEmpty(),
+    check("firstLesson").not().isEmpty(),
   ],
-  adminController.createAsssessment
+  adminController.createAssessment
 );
 
 route.post(
@@ -84,8 +92,30 @@ route.post(
     check("price").not().isEmpty(),
     check("number").not().isEmpty(),
     check("featureArray").not().isEmpty(),
+    check("duration").not().isEmpty(),
   ],
   adminController.createCourse
+);
+
+route.post(
+  "/delay-appointment/:sid/:tid",
+  fileUpload.fields([]),
+  [check("startInt").not().isEmpty()],
+  adminController.delayAppointment
+);
+
+route.post(
+  "/userCourse/add/:uid",
+  fileUpload.fields([]),
+  [check("courseName").not().isEmpty()],
+  adminController.addSuggestedCourse
+);
+
+route.post(
+  "/userCourse/remove/:uid",
+  fileUpload.fields([]),
+  [check("courseId").not().isEmpty()],
+  adminController.removeCourse
 );
 
 route.patch(

@@ -271,7 +271,7 @@ const getAllCourse = async (req, res, next) => {
   res.json({ course: course.map((elem) => elem.toObject({ getters: true })) });
 };
 
-updateLessons = async (req, res, next) => {
+const updateLessons = async (req, res, next) => {
   const error = validationResult(req);
   if (!error.isEmpty()) {
     return next(new HttpError("Invalid data", 422));
@@ -285,7 +285,14 @@ updateLessons = async (req, res, next) => {
     return next(new HttpError(err.message, 404));
   }
 
-  user.balance = parseInt(req.body.lessons) * 70;
+  user.balance = user.balance + parseInt(req.body.amount);
+  user.activeCourse = req.body.courseName;
+  if (req.body.amount > 0) {
+    user.totalPaid = user.totalPaid + parseInt(req.body.amount);
+  }
+
+  user.lessons = parseFloat(req.body.lessons);
+  user.courseDuration = req.body.duration;
 
   try {
     await user.save();
@@ -296,9 +303,45 @@ updateLessons = async (req, res, next) => {
   res.json({ user: user.toObject({ getters: true }) });
 };
 
+const getInitialAssess = async (req, res, next) => {
+  const userId = req.params.uid;
+  let assessment;
+
+  try {
+    assessment = await Assessment.findOne({
+      firstLesson: true,
+    });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+  if (assessment) {
+    res.json({ assess: assessment.toObject({ getters: true }) });
+  } else {
+    res.json({ message: "No Assessment Found" });
+  }
+};
+
+const getCourseByName = async (req, res, next) => {
+  const courseName = req.params.cname;
+  let course;
+  try {
+    course = await Course.findOne({ name: courseName });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (!course) {
+    return next(new HttpError("No course found by the name", 401));
+  }
+
+  res.json({ course: course.toObject({ getters: true }) });
+};
+
 exports.getUserInfo = getUserInfo;
 exports.getAssessmentInfo = getAssessmentInfo;
 exports.getAllCourse = getAllCourse;
+exports.getInitialAssess = getInitialAssess;
+exports.getCourseByName = getCourseByName;
 
 exports.updateUser = updateUser;
 exports.updatePassword = updatePassword;

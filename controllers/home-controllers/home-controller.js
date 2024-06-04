@@ -4,6 +4,10 @@ const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+var postmark = require("postmark");
+
+var client = new postmark.ServerClient("ec06f4ee-95bf-4e27-bf48-6c7156b782c4");
+
 const Appointment = require("../../models/appointment");
 const User = require("../../models/user");
 const Contact = require("../../models/contact");
@@ -36,6 +40,8 @@ const createAppointment = async (req, res, next) => {
     appName,
     alertText,
   } = req.body;
+
+  console.log(req.body);
 
   const curDate = new Date();
 
@@ -81,10 +87,7 @@ const createAppointment = async (req, res, next) => {
   try {
     await newAppointment.save();
   } catch (err) {
-    const error = new HttpError(
-      "Creating Appointment Failed, please retry",
-      500
-    );
+    const error = new HttpError(err.message, 500);
 
     return next(error);
   }
@@ -156,13 +159,26 @@ const signUp = async (req, res, next) => {
   });
 
   try {
-    await newUser.save();
+    await client.sendEmail({
+      From: "thomas@cdtdrivingart.com",
+      To: newUser.email,
+      Subject: "Registration Request Received",
+      HtmlBody:
+        "<p>Dear confident driver,</p><p>Thank you for puttting your confidence into <strong> Confident Drivcers Training School.</strong></p><p>We have received your registration request.</p><p>One of our Admins will review and approve the request as soon as possible</p><p>Thank You</p>",
+      TextBody:
+        "Thank you for puttting your confidence into Confident Drivers Training School. We have received your registration request. One of our Admins will review and approve the request as soon as possible. Thank You.",
+      MessageStream: "signup",
+    });
   } catch (err) {
-    const error = new HttpError(err, 500);
-
-    return next(error);
+    return next(new HttpError(err.message, 404));
   }
 
+  try {
+    await newUser.save();
+  } catch (err) {
+    const error = new HttpError(err.message, 500);
+    return next(error);
+  }
   res.status(201).json({ user: newUser.toObject({ getters: true }) });
 };
 

@@ -3,6 +3,7 @@ const HttpError = require("../../models/htttp-error");
 const { validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+var postmark = require("postmark");
 const {
   S3Client,
   PutObjectCommand,
@@ -27,6 +28,60 @@ const s3 = new S3Client({
   region: process.env.BUCKET_REGION,
 });
 
+const getIntValue = (timeVal) => {
+  let timeArr = [];
+
+  if (timeVal.length === 6) {
+    timeArr.push(timeVal.slice(0, 4));
+    timeArr.push(timeVal.slice(4, 6));
+  } else {
+    timeArr.push(timeVal.slice(0, 5));
+    timeArr.push(timeVal.slice(5, 7));
+  }
+
+  let setHour;
+
+  const timeIndi = timeArr[0].split(":");
+
+  if (timeArr[1] === "AM" || timeArr[0] === "12:00" || timeArr[0] === "12:30") {
+    if (timeIndi[1] === "30") {
+      setHour = parseFloat(timeIndi[0]) + 0.5;
+    } else {
+      setHour = parseFloat(timeIndi[0]);
+    }
+  } else {
+    if (timeIndi[1] === "30") {
+      setHour = parseFloat(timeIndi[0]) + 12.5;
+    } else {
+      setHour = parseFloat(timeIndi[0]) + 12;
+    }
+  }
+
+  return setHour;
+};
+
+const getTimeValue = (timeInt) => {
+  let timeStr;
+  if (timeInt < 12) {
+    timeStr =
+      timeInt % 1 === 0
+        ? timeInt.toString() + ":00AM"
+        : Math.floor(timeInt).toString() + ":30AM";
+  } else if ((timeInt === 12 || timeInt === 12.5) && timeInt < 13) {
+    timeStr =
+      timeInt % 1 === 0
+        ? timeInt.toString() + ":00PM"
+        : Math.floor(timeInt).toString() + ":30PM";
+  } else {
+    timeStr =
+      timeInt % 1 === 0
+        ? (timeInt - 12).toString() + ":00PM"
+        : Math.floor(timeInt - 12).toString() + ":30PM";
+  }
+
+  return timeStr;
+};
+
 const createCourse = async (req, res, next) => {
   const error = validationResult(req);
 
@@ -34,13 +89,26 @@ const createCourse = async (req, res, next) => {
     return next(new HttpError(error.message, 422));
   }
 
-  const { name, price, number, featureArray } = req.body;
+  const { name, price, number, featureArray, duration } = req.body;
+  let existCourse;
+  try {
+    existCourse = await Course.findOne({ name });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (existCourse) {
+    return next(
+      new HttpError("Course name already exists, choose an unique one")
+    );
+  }
 
   const newCourse = new Course({
     name,
     price,
     number,
     featureArray: JSON.parse(featureArray),
+    duration,
   });
 
   try {
@@ -114,21 +182,29 @@ const createAdmin = async (req, res, next) => {
   });
 };
 
-const createAsssessment = async (req, res, next) => {
+const createAssessment = async (req, res, next) => {
   const error = validationResult(req);
 
   if (!error.isEmpty()) {
     return next(new HttpError(error.message, 422));
   }
 
-  const { name, email, userId, appointmentId, infractionsStr, total } =
-    req.body;
+  const {
+    name,
+    email,
+    userId,
+    appointmentId,
+    infractionsStr,
+    total,
+    firstLesson,
+  } = req.body;
 
   const curDate = new Date();
 
   const dateOfMonth = curDate.getDate().toString();
   let hourNow = curDate.getHours();
   let minuteNow = curDate.getMinutes();
+  let extraMoney = 0;
 
   if (minuteNow <= 9) {
     minuteNow = "0" + minuteNow.toString();
@@ -162,6 +238,27 @@ const createAsssessment = async (req, res, next) => {
   }
   app.status = "COMPLETED";
 
+  const curD = new Date();
+
+  const hour = curD.getHours();
+  const min = curD.getMinutes();
+  let newMin = 0;
+  if (min > 15) {
+    newMin = 0.5;
+  }
+
+  //12.5 = hour+newMin
+  const orgEnd = getIntValue(app.endTime);
+  const duraArr = app.duration.split(" ");
+  if (hour + newMin > orgEnd) {
+    const newEnd = getTimeValue(hour + newMin);
+    app.endTime = newEnd;
+    const extraDura = hour + newMin - getIntValue(app.startTime);
+
+    extraMoney = parseFloat(duraArr[0] - extraDura) * 70;
+    app.duration = extraDura.toString() + " hours";
+  }
+
   app.alerts.push(alert);
 
   try {
@@ -189,7 +286,6 @@ const createAsssessment = async (req, res, next) => {
   user.scoreIndicator = total;
 
   prevHourArr = user.totalHours?.split(" ");
-  console.log(prevHourArr);
 
   prevHour = prevHourArr ? parseFloat(prevHourArr[0]) : 0;
 
@@ -207,6 +303,9 @@ const createAsssessment = async (req, res, next) => {
   user.totalHours = (prevHour + curHour).toString() + " hours";
   user.latestScore = total;
 
+  if (extraMoney < 0) {
+    user.extraPay += extraMoney;
+  }
   try {
     await user.save();
   } catch (err) {
@@ -226,6 +325,7 @@ const createAsssessment = async (req, res, next) => {
     appointmentId,
     infractions,
     total,
+    firstLesson,
   });
 
   try {
@@ -670,21 +770,26 @@ const deleteUser = async (req, res, next) => {
     return next(new HttpError("Admin Couldn't be Deleted", 500));
   }
 
-  const params1 = {
-    Bucket: process.env.BUCKET_NAME,
-    Key: user.image,
-  };
+  if (
+    user.image !=
+    "https://www.repol.copl.ulaval.ca/wp-content/uploads/2019/01/default-user-icon.jpg"
+  ) {
+    const params1 = {
+      Bucket: process.env.BUCKET_NAME,
+      Key: user.image,
+    };
 
-  const command1 = new DeleteObjectCommand(params1);
-  await s3.send(command1);
+    const command1 = new DeleteObjectCommand(params1);
+    await s3.send(command1);
 
-  const params2 = {
-    Bucket: process.env.BUCKET_NAME,
-    Key: user.coverImage,
-  };
+    const params2 = {
+      Bucket: process.env.BUCKET_NAME,
+      Key: user.coverImage,
+    };
 
-  const command2 = new DeleteObjectCommand(params2);
-  await s3.send(command2);
+    const command2 = new DeleteObjectCommand(params2);
+    await s3.send(command2);
+  }
 
   try {
     await User.deleteOne({ _id: uId });
@@ -806,14 +911,234 @@ const updateUserStatus = async (req, res, next) => {
     return next(error);
   }
 
+  try {
+    await client.sendEmail({
+      From: "thomas@cdtdrivingart.com",
+      To: user.email,
+      Subject: "Registration Approved",
+      HtmlBody:
+        "<p>Dear confident driver,</p><p>Your request for registration has been approved.</p><p>Please head onto our site and log into your dashboard to begin your journey towards driver's licence</p><p>Thank You</p>",
+      TextBody:
+        "Dear confident driver,Your request for registration has been approved.Please head onto our site and log into your dashboard to begin your journey towards driver's licence.Thank You",
+      MessageStream: "signup",
+    });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
   res.status(200).json({
     user: user.toObject({ getters: true }),
   });
 };
 
+const delayAppointment = async (req, res, next) => {
+  const error = validationResult(req);
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  let startTime = req.params.sid;
+  let today = req.params.tid;
+  let { startInt } = req.body;
+  let apps;
+  try {
+    apps = await Appointment.find({ date: today });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  for (const app of apps) {
+    const appTime = getIntValue(app.startTime);
+    if (appTime >= startInt) {
+      let newStart = appTime + 0.5;
+      let newEnd = getIntValue(app.endTime) + 0.5;
+
+      app.startTime = getTimeValue(newStart);
+      app.endTime = getTimeValue(newEnd);
+      try {
+        await app.save();
+      } catch (err) {
+        return next(new HttpError(err.message, 404));
+      }
+    }
+  }
+
+  res.json({
+    appointment: apps.map((elem) => elem.toObject({ getters: true })),
+  });
+};
+
+const payUserDue = async (req, res, next) => {
+  const userId = req.params.uid;
+
+  let user;
+
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+  user.totalPaid += Math.abs(user.extraPay);
+  user.extraPay = 0;
+
+  try {
+    await user.save();
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  res.status(200).json({
+    user: user.toObject({ getters: true }),
+  });
+};
+
+const addSuggestedCourse = async (req, res, next) => {
+  const error = validationResult(req);
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  const userId = req.params.uid;
+  const { courseName } = req.body;
+  let user;
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  user.suggestedCourse = courseName;
+  try {
+    await user.save();
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  res.json({ user: user.toObject({ getters: true }) });
+};
+
+const removeCourse = async (req, res, next) => {
+  const error = validationResult(req);
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  const userID = req.params.uid;
+  const { courseId } = req.body;
+
+  let user;
+  try {
+    user = await User.findById(userID);
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  user.suggestedCourse = "";
+
+  try {
+    await user.save();
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  res.json({ user: user.toObject({ getters: true }) });
+};
+
+const searchUser = async (req, res, next) => {
+  searchParams = req.params.info;
+  let user;
+  try {
+    user = await User.findOne({ number: searchParams });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (user) {
+    res.json({ user: user.toObject({ getters: true }) });
+  }
+
+  try {
+    user = await User.findOne({ email: searchParams });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (user) {
+    res.json({ user: user.toObject({ getters: true }) });
+  } else {
+    return next(new HttpError("No user found with the number or email", 404));
+  }
+};
+
+const linkAppointment = async (req, res, next) => {
+  const error = validationResult(req);
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  const { userId } = req.body;
+  const appId = req.params.aid;
+
+  let appointment;
+  let appointments;
+  let user;
+
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (!user) {
+    return next(new HttpError("no user found, please try again later", 404));
+  }
+
+  try {
+    appointments = await Appointment.find({ userId: userId });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+  count = 0;
+  for (app of appointments) {
+    if (app.status == "PENDING" || app.status == "ADMIN CONFIRMED") {
+      count++;
+    }
+  }
+
+  if (count <= 2) {
+    try {
+      appointment = await Appointment.findById(appId);
+    } catch (err) {
+      return next(new HttpError(err.message, 404));
+    }
+
+    if (appointment) {
+      curD = new Date();
+      appointment.userId = userId;
+      appointment.name = user.fname + " " + user.lname;
+      appointment.email = user.email;
+      appointment.number = user.number;
+      appointment.appName = "lesson" + curD.toLocaleDateString("en-CA");
+      try {
+        await appointment.save();
+      } catch (err) {
+        throw new HttpError(err.message, 404);
+      }
+
+      res.json({ appointment: appointment.toObject({ getters: true }) });
+    } else {
+      return next(
+        new HttpError(" No Appointment found, please try again later", 404)
+      );
+    }
+  } else {
+    return next(new HttpError("Appointment Limit For the user exceeded", 404));
+  }
+};
+
 exports.createAdmin = createAdmin;
 exports.createCourse = createCourse;
-exports.createAsssessment = createAsssessment;
+exports.createAssessment = createAssessment;
 
 exports.getAdminInfo = getAdminInfo;
 exports.getCourseInfo = getCourseInfo;
@@ -833,3 +1158,10 @@ exports.deleteUser = deleteUser;
 exports.deleteAdmin = deleteAdmin;
 exports.deleteAppointment = deleteAppointment;
 exports.deleteCourse = deleteCourse;
+
+exports.delayAppointment = delayAppointment;
+exports.payUserDue = payUserDue;
+exports.addSuggestedCourse = addSuggestedCourse;
+exports.removeCourse = removeCourse;
+exports.searchUser = searchUser;
+exports.linkAppointment = linkAppointment;

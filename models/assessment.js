@@ -10,6 +10,7 @@ const assessmentSchema = Schema({
   infractions: { type: Object, required: true },
   total: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now },
+  firstLesson: { type: Boolean, default: false },
 });
 
 module.exports = mongoose.model("Assessment", assessmentSchema);

@@ -22,17 +22,24 @@ route.get("/appointment/info/:aid", appointmentController.getAppointmentInfo);
 route.get("/appointment/all/:uid", appointmentController.getAllAppointmentInfo);
 
 route.get("/assessment/info/:aid", userController.getAssessmentInfo);
+route.get("/initial-assessment/:uid", userController.getInitialAssess);
 route.get(
   "/appointment/times/:startTime",
   appointmentController.getAppointmenmtTime
 );
+route.get("/course/info/:cname", userController.getCourseByName);
 
 route.use(checkUserAuth);
 
 route.post(
   "/user-lesson/:uid",
   fileUpload.fields([]),
-  [check("lessons").not().isEmpty()],
+  [
+    check("lessons").not().isEmpty(),
+    check("courseName").not().isEmpty(),
+    check("amount").not().isEmpty(),
+    check("duration").not().isEmpty(),
+  ],
   userController.updateLessons
 );
 

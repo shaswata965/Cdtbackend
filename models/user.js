@@ -26,8 +26,12 @@ const userSchema = Schema({
   scoreIndicator: { type: String },
   totalHours: { type: String },
   hourIndicator: { type: String },
-  balance: { type: String },
+  balance: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
+  totalPaid: { type: Number, default: 0 },
+  lessons: { type: Number, default: 0 },
+  extraPay: { type: Number, default: 0 },
+  courseDuration: { type: String },
 });
 
 userSchema.plugin(mongooseUniqueValidator);

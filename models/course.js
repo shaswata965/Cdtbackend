@@ -12,6 +12,7 @@ const courseSchema = Schema({
       required: true,
     },
   ],
+  duration: { type: String, required: true },
 });
 
 module.exports = mongoose.model("Course", courseSchema);

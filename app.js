@@ -48,7 +48,7 @@ app.use((error, req, res, next) => {
       console.log(err);
     });
   }
-  if (res.headerSent) {
+  if (res.headersSent) {
     return next(error);
   }
 
