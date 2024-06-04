@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 
 var postmark = require("postmark");
 
-var client = new postmark.ServerClient("ec06f4ee-95bf-4e27-bf48-6c7156b782c4");
+var client = new postmark.ServerClient(process.env.POSTMARK_SECRET_KEY);
 
 const Appointment = require("../../models/appointment");
 const User = require("../../models/user");

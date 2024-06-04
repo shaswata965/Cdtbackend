@@ -13,6 +13,7 @@ const {
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const sharp = require("sharp");
+var client = new postmark.ServerClient(process.env.POSTMARK_SECRET_KEY);
 
 const Admin = require("../../models/admin");
 const User = require("../../models/user");
