@@ -32,6 +32,7 @@ const userSchema = Schema({
   lessons: { type: Number, default: 0 },
   extraPay: { type: Number, default: 0 },
   courseDuration: { type: String },
+  curToken: { type: String },
 });
 
 userSchema.plugin(mongooseUniqueValidator);

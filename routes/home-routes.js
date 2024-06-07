@@ -59,6 +59,18 @@ routes.post(
 );
 
 routes.post(
+  "/forget-password",
+  [check("input").not().isEmpty()],
+  homeController.forgetMailer
+);
+
+routes.post(
+  "/reset-password",
+  [check("password").not().isEmpty(), check("token").not().isEmpty()],
+  homeController.resetPassword
+);
+
+routes.post(
   "/contact",
   fileUpload.fields([]),
   [

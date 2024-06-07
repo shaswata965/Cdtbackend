@@ -117,6 +117,8 @@ const signUp = async (req, res, next) => {
   let existUserEm;
   let existUserNum;
 
+  let curToken = uuidv4();
+
   try {
     existUserEm = await User.findOne({ email: email });
     existUserNum = await User.findOne({ number: number });
@@ -156,6 +158,7 @@ const signUp = async (req, res, next) => {
     password: hashedPassword,
     status,
     image,
+    curToken,
   });
 
   try {
@@ -190,6 +193,7 @@ const logIn = async (req, res, next) => {
   }
 
   const { email, password } = req.body;
+  let curToken = uuidv4();
 
   let existUser;
 
@@ -240,6 +244,13 @@ const logIn = async (req, res, next) => {
     return next(new HttpError("Authorization Error", 401));
   }
 
+  try {
+    existUser.save();
+  } catch (err) {
+    return next(new HttpError(err.message, 401));
+  }
+  existUser.curToken = curToken;
+
   res.json({
     userId: existUser.id,
     email: existUser.email,
@@ -274,7 +285,101 @@ const createContact = async (req, res, next) => {
   res.status(200).json({ newContact });
 };
 
+const forgetMailer = async (req, res, next) => {
+  const error = validationResult(req);
+
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  let user;
+  try {
+    user = await User.findOne({ email: req.body.input });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (!user) {
+    try {
+      user = await User.findOne({ number: req.body.input });
+    } catch (err) {
+      return next(new HttpError(err.message, 404));
+    }
+  }
+
+  if (!user) {
+    return next(new HttpError("No User found with the credential", 404));
+  }
+
+  if (user.status == "PENDING") {
+    return next(
+      new HttpError("Your Account is still pending admin approval", 404)
+    );
+  }
+
+  try {
+    await client.sendEmail({
+      From: "thomas@cdtdrivingart.com",
+      To: user.email,
+      Subject: "Password Reset Request",
+      HtmlBody: `<p>Dear confident driver,</p><p>We have received a request to reset your password.</p><p>If you did not make the request, 
+      ignore this email and let one of our instructor/admin know.</p><p>Please follow the link below to reset your password.
+      </p><h4>https://cdtdrivingart.com/reset/${user.curToken}</h4><p>Thank You</p>`,
+      TextBody: `Dear confident driver,We have received a request to reset your password.If you did not make the request, 
+      ignore this email and let one of our instructor/admin know.Please follow the link below to reset your password.
+      https://cdtdrivingart.com/reset/${user.curToken}.Thank You`,
+      MessageStream: "signup",
+    });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+  res.status(200).json({ user });
+};
+
+const resetPassword = async (req, res, next) => {
+  const error = validationResult(req);
+
+  if (!error.isEmpty()) {
+    return next(new HttpError("Invalid data", 422));
+  }
+
+  let user;
+  try {
+    user = await User.findOne({ curToken: req.body.token });
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+
+  if (!user) {
+    return next(
+      new HttpError(
+        "Check the link, and try again. If this persists contact an Admin.",
+        404
+      )
+    );
+  }
+
+  try {
+    hashedPassword = await bcrypt.hash(req.body.password, 12);
+  } catch (err) {
+    const error = new HttpError(err.message, 500);
+
+    return next(error);
+  }
+
+  user.password = hashedPassword;
+  user.curToken = uuidv4();
+  try {
+    user.save();
+  } catch (err) {
+    return next(new HttpError(err.message, 404));
+  }
+  res.status(200).json({ user });
+};
+
 exports.createAppointment = createAppointment;
 exports.signUp = signUp;
 exports.login = logIn;
 exports.createContact = createContact;
+exports.forgetMailer = forgetMailer;
+exports.resetPassword = resetPassword;
