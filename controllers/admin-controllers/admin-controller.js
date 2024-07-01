@@ -914,7 +914,7 @@ const updateUserStatus = async (req, res, next) => {
 
   try {
     await client.sendEmail({
-      From: "thomas@cdtdrivingart.com",
+      From: process.env.DOMAIN_EMAIL_ADDRESS,
       To: user.email,
       Subject: "Registration Approved",
       HtmlBody:
